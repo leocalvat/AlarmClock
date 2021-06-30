@@ -1,0 +1,26 @@
+// Pins connection
+// A0       NC
+// GPIO0
+// GPIO1    TX Serial to PC
+// GPIO2    I2C SDA
+// GPIO3    LED Strip Data
+// GPIO4    TX Player
+// GPIO5    RX Player
+// GPIO6    RTC Interrupt       /!\ define input pullup by Player.init(6, 5, 4);
+// GPIO7    BTN Snooze
+// GPIO8    BTN Mode
+// GPIO9    BTN Alarms
+// GPIO10   BTN Set
+// GPIO11   BTN Up
+// GPIO12   BTN Down
+// GPIO13   BTN Play ??
+// GPIO14   I2C SCL
+// GPIO15   LED Alarm1
+// GPIO16   LED Alarm2
+//
+//     __ __
+//  2 | 3 4 | 5
+//  1 |__ __| 6     - 56
+// 12 |13 14| 7     - 57
+// 11 |__ __| 8      
+//     10 9
