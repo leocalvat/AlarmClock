@@ -5,6 +5,7 @@
 #include "Player.h"
 
 void IRAM_ATTR ISR();
+void turnOffAlarm();
 
 #define ANALOG_IN A0 // NC
 #define GPIO0 0      // NC
@@ -22,7 +23,7 @@ void IRAM_ATTR ISR();
 
 #define INTERVAL_SNOOZE 600000 // 10min
 #define INTERVAL_DISPLAY 5000  // 5sec
-#define INTERVAL_CLOCK 500     // 500u
+#define INTERVAL_CLOCK 1000    // 1sec
 
 volatile bool flags[8] = {false, false, false, false, false, false, false, false};
 unsigned long tsSnooze;
@@ -30,9 +31,10 @@ unsigned long tsMod;
 bool snoozeEnable = false;
 bool alarming = false;
 bool displayed = false;
+bool blink = false;
 uint8_t vol = 20;
 RgbColor dispColor = WHITE;
-RtcDateTime tempDatetime;
+RtcDateTime tempDateTime;
 
 void setup()
 {
@@ -102,14 +104,15 @@ void loop()
     case CLOCK:
         if ((millis() - tsMod) > INTERVAL_CLOCK)
         {
-            displayClock(getClockTime(), dispColor);
+            blink = !blink;
+            displayDigits(clockToDigits(getClockTime()), blink, blink, dispColor, dispColor);
             tsMod = millis();
         }
         break;
     case DATE:
         if (!displayed)
         {
-            displayDate(getClockTime(), dispColor);
+            displayDigits(dateToDigits(getClockTime()), false, false, dispColor, dispColor);
             displayed = true;
         }
         if ((millis() - tsMod) > INTERVAL_DISPLAY)
@@ -118,7 +121,7 @@ void loop()
     case YEAR:
         if (!displayed)
         {
-            displayDate(getClockTime(), dispColor, true);
+            displayDigits(dateToDigits(getClockTime(), true), false, false, dispColor, dispColor);
             displayed = true;
         }
         if ((millis() - tsMod) > INTERVAL_DISPLAY)
@@ -127,7 +130,7 @@ void loop()
     case TEMP:
         if (!displayed)
         {
-            displayTemp(Clock.GetTemperature(), dispColor);
+            displayDigits(tempToDigits(Clock.GetTemperature().AsFloatDegC()), false, true, dispColor, dispColor);
             displayed = true;
         }
         if ((millis() - tsMod) > INTERVAL_DISPLAY)
@@ -136,8 +139,8 @@ void loop()
     case ALARM1:
         if (!displayed)
         {
-            Clock.GetAlarmOne();
-            displayClock(getClockTime(), dispColor);
+            DS3231AlarmOne al = Clock.GetAlarmOne();
+            displayDigits(nbToDigits(al.Hour(), al.Minute()), true, true, dispColor, dispColor);
             displayed = true;
         }
         if ((millis() - tsMod) > INTERVAL_DISPLAY)
@@ -146,49 +149,62 @@ void loop()
     case ALARM2:
         if (!displayed)
         {
-            Clock.GetAlarmTwo();
-            displayClock(getClockTime(), dispColor);
+            DS3231AlarmTwo al = Clock.GetAlarmTwo();
+            displayDigits(nbToDigits(al.Hour(), al.Minute()), true, true, dispColor, dispColor);
+            displayed = true;
+        }
+        if ((millis() - tsMod) > INTERVAL_DISPLAY)
+            displayMod = CLOCK;
+        break;
+    case SET_VOLUME:
+        if (!displayed)
+        {
+            displayDigits(nbToDigits(0, vol), false, true, OFF, dispColor);
             displayed = true;
         }
         if ((millis() - tsMod) > INTERVAL_DISPLAY)
             displayMod = CLOCK;
         break;
     default:
-        //b();
+        displayMod = CLOCK;
         break;
     }
 
     /////   Handle Interrupts   /////
-    if (flags[0]) // RTC
+    if (flags[0]) // RTC Alarm
     {
         Player.playFile(0);
         displayMisc(WHITE);
         flags[0] = false;
+        alarming = true;
         Clock.LatchAlarmsTriggeredFlags();
     }
     if (flags[1]) // Snooze
     {
-        if (Player.isBusy())
-            Player.stop();
+        turnOffAlarm();
         tsSnooze = millis();
         snoozeEnable = true;
     }
     if (flags[2]) // Mode
     {
-        if (displayMod == CLOCK)
+        if (alarming)
+            turnOffAlarm();
+        else if (displayMod == CLOCK)
             displayMod = DATE;
         else if (displayMod == DATE)
             displayMod = YEAR;
         else if (displayMod == YEAR)
             displayMod = TEMP;
-        else if (displayMod == TEMP || displayMod == VOLUME || displayMod == ALARM1 || displayMod == ALARM2)
+        else if (displayMod == TEMP || displayMod == ALARM1 || displayMod == ALARM2)
             displayMod = CLOCK;
         displayed = false;
         tsMod = millis();
     }
     if (flags[3]) // Alarms
     {
-        if (displayMod == CLOCK || displayMod == DATE || displayMod == YEAR || displayMod == VOLUME || displayMod == TEMP)
+        if (alarming)
+            turnOffAlarm();
+        else if (displayMod == CLOCK || displayMod == DATE || displayMod == YEAR || displayMod == TEMP)
             displayMod = ALARM1;
         else if (displayMod == ALARM1)
             displayMod = ALARM2;
@@ -197,17 +213,53 @@ void loop()
         displayed = false;
         tsMod = millis();
     }
-    if (flags[4])
+    if (flags[4]) // SET
     {
+        if (alarming)
+            turnOffAlarm();
+        else if (displayMod == CLOCK)
+            displayMod = SET_CLOCK;
+        else if (displayMod == DATE)
+            displayMod = SET_DATE;
+        else if (displayMod == YEAR)
+            displayMod = SET_YEAR;
+        else if (displayMod == ALARM1)
+            displayMod = SET_ALARM1;
+        else if (displayMod == ALARM2)
+            displayMod = SET_ALARM2;
     }
-    if (flags[5])
+    if (flags[5]) // UP
     {
+        if (alarming)
+            turnOffAlarm();
+        else if (displayMod == CLOCK)
+            displayMod = SET_VOLUME;
+        else if (displayMod == SET_VOLUME && vol != VOL_MAX)
+        {
+            vol++;
+            displayed = false;
+            tsMod = millis();
+        }
+        else if (displayMod == SET_ALARM1)
+            ;
+        else if (displayMod == SET_ALARM2)
+            ;
+        else if (displayMod == SET_CLOCK)
+            ;
+        else if (displayMod == SET_DATE)
+            ;
+        else if (displayMod == SET_YEAR)
+            ;
     }
-    if (flags[6])
+    if (flags[6]) // DOWN
     {
+        if (alarming)
+            turnOffAlarm();
     }
-    if (flags[7])
+    if (flags[7]) // PLAY
     {
+        if (alarming)
+            turnOffAlarm();
     }
 
     if (snoozeEnable && ((millis() - tsSnooze) > INTERVAL_SNOOZE))
@@ -215,6 +267,13 @@ void loop()
         flags[0] = 1;
         snoozeEnable = false;
     }
+}
+
+void turnOffAlarm()
+{
+    if (Player.isBusy())
+        Player.stop();
+    displayMisc(OFF);
 }
 
 void IRAM_ATTR ISR()
