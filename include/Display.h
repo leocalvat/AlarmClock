@@ -7,17 +7,23 @@
 
 void initDisplay();
 void fillDisplay(RgbColor color);
-void displayClock(RtcDateTime &t, RgbColor color);
-void displayDate(RtcDateTime &t, RgbColor color, bool year);
-void displayTemp(RtcTemperature &t, RgbColor color);
+uint8_t *clockToDigits(const RtcDateTime &t);
+uint8_t *nbToDigits(uint8_t hh, uint8_t mm);
+uint8_t *dateToDigits(const RtcDateTime &t, bool year);
+uint8_t *tempToDigits(const float &t);
+void displayDigits(uint8_t *d, bool dotL, bool dotH, RgbColor colorL, RgbColor colorR);
 void displayMisc(RgbColor color);
 
 #define TOTAL_LED_COUNT 62 // has to be the number of LEDs (56 + 2 + 4)
 #define DIGIT_LED_COUNT 14 // 7 seg * 2 LED
 #define CLOCK_LED_COUNT 58 // 4 digit + 2 dot
 #define MISC_LED_COUNT 4
+#define DIGIT_COUNT 4 // HH:MM
 
 #define WHITE RgbColor(50, 50, 50)
+#define OFF RgbColor(0)
+
+uint8_t d[DIGIT_COUNT];
 
 enum DisplayMods
 {
@@ -26,8 +32,13 @@ enum DisplayMods
     YEAR,
     ALARM1,
     ALARM2,
-    VOLUME,
-    TEMP
+    TEMP,
+    SET_CLOCK,
+    SET_DATE,
+    SET_YEAR,
+    SET_ALARM1,
+    SET_ALARM2,
+    SET_VOLUME
 } displayMod;
 
 NeoPixelBus<NeoRgbFeature, NeoWs2813Method> Strip(TOTAL_LED_COUNT); // All the available methods here https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods
@@ -59,42 +70,26 @@ void initDisplay()
     delay(500);
 }
 
-void displayClock(const RtcDateTime &t, RgbColor color, bool stopDots = false)
+uint8_t *clockToDigits(const RtcDateTime &t)
 {
-    uint8_t index = 0;
-    uint8_t d[4];
     d[0] = uint8_t(t.Hour() / 10);
     d[1] = uint8_t(t.Hour() % 10);
     d[2] = uint8_t(t.Minute() / 10);
     d[3] = uint8_t(t.Minute() % 10);
-    for (size_t i = 0; i < 4; i++)
-    {
-        for (size_t j = 0; j < DIGIT_LED_COUNT; j++)
-        {
-            if (digits[d[i]][j])
-                Strip.SetPixelColor(index, color);
-            else
-                Strip.SetPixelColor(index, RgbColor(0));
-            index++;
-        }
-    }
-    if (t.Second() % 2 == 0)
-    {
-        Strip.SetPixelColor(index, color);
-        Strip.SetPixelColor(index + 1, color);
-    }
-    else
-    {
-        Strip.SetPixelColor(index, RgbColor(0));
-        Strip.SetPixelColor(index + 1, RgbColor(0));
-    }
-    Strip.Show();
+    return d;
 }
 
-void displayDate(const RtcDateTime &t, RgbColor color, bool year = false)
+uint8_t *nbToDigits(uint8_t nbL, uint8_t nbR)
 {
-    uint8_t index = 0;
-    uint8_t d[4];
+    d[0] = uint8_t(nbL / 10);
+    d[1] = uint8_t(nbL % 10);
+    d[2] = uint8_t(nbR / 10);
+    d[3] = uint8_t(nbR % 10);
+    return d;
+}
+
+uint8_t *dateToDigits(const RtcDateTime &t, bool year = false)
+{
     if (!year)
     {
         d[0] = uint8_t(t.Day() / 10);
@@ -109,44 +104,43 @@ void displayDate(const RtcDateTime &t, RgbColor color, bool year = false)
         d[2] = uint8_t((t.Year() / 10) % 10);
         d[3] = uint8_t(t.Year() % 10);
     }
-
-    for (size_t i = 0; i < 4; i++)
-    {
-        for (size_t j = 0; j < DIGIT_LED_COUNT; j++)
-        {
-            if (digits[d[i]][j])
-                Strip.SetPixelColor(index, color);
-            else
-                Strip.SetPixelColor(index, RgbColor(0));
-            index++;
-        }
-    }
-    Strip.SetPixelColor(index, RgbColor(0));
-    Strip.SetPixelColor(index + 1, RgbColor(0));
-    Strip.Show();
+    return d;
 }
 
-void displayTemp(RtcTemperature t, RgbColor color)
+uint8_t *tempToDigits(const float &t)
 {
-    uint8_t index = 0;
-    uint8_t d[4];
-    d[0] = uint8_t((int)t.AsFloatDegC() / 10);
-    d[1] = uint8_t((int)t.AsFloatDegC() % 10);
+    d[0] = uint8_t((int)t / 10);
+    d[1] = uint8_t((int)t % 10);
     d[2] = 11; // °C
     d[3] = 10; // off
-    for (size_t i = 0; i < 4; i++)
+    return d;
+}
+
+void displayDigits(uint8_t *d, bool dotL, bool dotH, RgbColor colorL, RgbColor colorR)
+{
+    RgbColor color = colorL;
+    uint8_t index = 0;
+    for (size_t i = 0; i < DIGIT_COUNT; i++)
     {
         for (size_t j = 0; j < DIGIT_LED_COUNT; j++)
         {
             if (digits[d[i]][j])
                 Strip.SetPixelColor(index, color);
             else
-                Strip.SetPixelColor(index, RgbColor(0));
+                Strip.SetPixelColor(index, OFF);
             index++;
         }
+        if (i == 1)
+            color = colorR;
     }
-    Strip.SetPixelColor(index, color);
-    Strip.SetPixelColor(index + 1, RgbColor(0));
+    if (dotL)
+        Strip.SetPixelColor(index, colorL);
+    else
+        Strip.SetPixelColor(index, OFF);
+    if (dotH)
+        Strip.SetPixelColor(index + 1, colorR);
+    else
+        Strip.SetPixelColor(index + 1, OFF);
     Strip.Show();
 }
 
