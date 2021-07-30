@@ -3,6 +3,7 @@
 #include "Display.h"
 #include "Clock.h"
 #include "Player.h"
+#include "Memory.h"
 
 void IRAM_ATTR ISR();
 RgbColor getDimmedColor();
@@ -71,6 +72,9 @@ void setup()
     initDisplay();
     displayMod = CLOCK;
     dimMod = DIM_AUTO;
+
+    // Init Memory
+    EEPROM.begin(MEMORY_SIZE);
 
     // Init RTC Module
     initRTC();
