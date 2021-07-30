@@ -1,7 +1,7 @@
 // Pins connection
-// A0       NC
-// GPIO0
-// GPIO1    TX Serial to PC
+// A0       PhotoRes feedback
+// GPIO0    MOSFET enable (power audio modules)
+// GPIO1    TX Serial to PC + PhotoRes power
 // GPIO2    I2C SDA
 // GPIO3    LED Strip Data
 // GPIO4    TX Player

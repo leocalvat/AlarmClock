@@ -7,19 +7,136 @@
 void initRTC();
 RtcDateTime getClockTime();
 uint16_t adjustDstEurope(RtcDateTime &t);
+void setTempDateTime(uint8_t hour, uint8_t min, uint8_t dd, uint8_t mm, uint16_t yyyy);
+void setTempDateTime(RtcDateTime &t);
+void setClock();
+void setAlarm1Time();
+void setAlarm2Time();
+void setAlarm(Alarms alarms, bool on);
+void setAlarmInterrupt();
+
+#define LED_ALARM1 15
+#define LED_ALARM2 16
 
 RtcDS3231<TwoWire> Clock(Wire);
+bool AlarmOne;
+bool AlarmTwo;
+
+enum Alarms
+{
+    ALARM_ONE,
+    ALARM_TWO
+};
+
+struct TempDateTime
+{
+    uint8_t hour;
+    uint8_t min;
+    uint8_t day;
+    uint8_t month;
+    uint16_t year;
+} tempDateTime;
 
 void initRTC()
 {
+    Clock.Begin(2, 14);
+    //Wire.begin(2, 14);
+    //Clock.Begin();
     Clock.Enable32kHzPin(false);
-    Clock.SetSquareWavePin(DS3231SquareWavePin_ModeNone);
+    //Clock.SetSquareWavePin(DS3231SquareWavePin_ModeNone);
+    if (!Clock.IsDateTimeValid())
+    {
+        displayMod = SET_HOUR;
+        setTempDateTime(0, 0, 1, 1, 2020);
+        // get Alarms from memory and set alarm
+    }
+    if (!Clock.GetIsRunning())
+        Clock.SetIsRunning(true);
 }
 
 RtcDateTime getClockTime()
 {
     RtcDateTime t = Clock.GetDateTime();
     return RtcDateTime(t.TotalSeconds() + adjustDstEurope(t));
+}
+
+void setTempDateTime(uint8_t hour, uint8_t min, uint8_t dd, uint8_t mm, uint16_t yyyy)
+{
+    tempDateTime.hour = hour;
+    tempDateTime.min = min;
+    tempDateTime.day = dd;
+    tempDateTime.month = mm;
+    tempDateTime.year = yyyy;
+}
+
+void setTempDateTime(RtcDateTime &t)
+{
+    tempDateTime.hour = t.Hour();
+    tempDateTime.min = t.Minute();
+    tempDateTime.day = t.Day();
+    tempDateTime.month = t.Month();
+    tempDateTime.year = t.Year();
+}
+
+void setClock()
+{
+    Clock.SetDateTime(RtcDateTime(tempDateTime.year, tempDateTime.month, tempDateTime.day, tempDateTime.hour, tempDateTime.min, 0));
+}
+
+void setAlarm1Time()
+{
+    Clock.SetAlarmOne(DS3231AlarmOne(0, tempDateTime.hour, tempDateTime.min, 0, DS3231AlarmOneControl_HoursMinutesSecondsMatch));
+    setAlarm(ALARM_ONE, true);
+}
+
+void setAlarm2Time()
+{
+    Clock.SetAlarmTwo(DS3231AlarmTwo(0, tempDateTime.hour, tempDateTime.min, DS3231AlarmTwoControl_HoursMinutesMatch));
+    setAlarm(ALARM_TWO, true);
+}
+
+void setAlarm(Alarms alarms, bool on)
+{
+    if (alarms == ALARM_ONE)
+    {
+        if (on)
+        {
+            AlarmOne = true;
+            digitalWrite(LED_ALARM1, HIGH);
+        }
+        else
+        {
+            AlarmOne = false;
+            digitalWrite(LED_ALARM1, LOW);
+        }
+    }
+    else if (alarms == ALARM_TWO)
+    {
+        if (on)
+        {
+            AlarmTwo = true;
+            digitalWrite(LED_ALARM2, HIGH);
+        }
+        else
+        {
+            AlarmTwo = false;
+            digitalWrite(LED_ALARM2, LOW);
+        }
+    }
+    setAlarmInterrupt();
+}
+
+void setAlarmInterrupt()
+{
+    DS3231SquareWavePinMode mode = DS3231SquareWavePin_ModeNone;
+    if (AlarmOne && AlarmTwo)
+        mode = DS3231SquareWavePin_ModeAlarmBoth;
+    else if (AlarmOne)
+        mode = DS3231SquareWavePin_ModeAlarmOne;
+    else if (AlarmTwo)
+        mode = DS3231SquareWavePin_ModeAlarmTwo;
+    Clock.LatchAlarmsTriggeredFlags();
+    Clock.SetSquareWavePin(mode);
 }
 
 uint16_t adjustDstEurope(RtcDateTime &t)

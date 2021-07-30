@@ -20,7 +20,7 @@ void displayMisc(RgbColor color);
 #define MISC_LED_COUNT 4
 #define DIGIT_COUNT 4 // HH:MM
 
-#define WHITE RgbColor(50, 50, 50)
+#define WHITE RgbColor(150, 150, 150)
 #define OFF RgbColor(0)
 
 uint8_t d[DIGIT_COUNT];
@@ -33,11 +33,15 @@ enum DisplayMods
     ALARM1,
     ALARM2,
     TEMP,
-    SET_CLOCK,
-    SET_DATE,
+    SET_HOUR,
+    SET_MIN,
+    SET_DAY,
+    SET_MONTH,
     SET_YEAR,
-    SET_ALARM1,
-    SET_ALARM2,
+    SET_ALARM1_HOUR,
+    SET_ALARM1_MIN,
+    SET_ALARM2_HOUR,
+    SET_ALARM2_MIN,
     SET_VOLUME
 } displayMod;
 
@@ -142,6 +146,7 @@ void displayDigits(uint8_t *d, bool dotL, bool dotH, RgbColor colorL, RgbColor c
     else
         Strip.SetPixelColor(index + 1, OFF);
     Strip.Show();
+    Serial.print("Display digits " + d[0] + d[1] + ':' + d[2] + d[3]);
 }
 
 void displayMisc(RgbColor color)
@@ -150,6 +155,7 @@ void displayMisc(RgbColor color)
     for (size_t i = 0; i < MISC_LED_COUNT; i++)
         Strip.SetPixelColor(index + i, color);
     Strip.Show();
+    Serial.print("Display misc");
 }
 
 void fillDisplay(RgbColor color)
