@@ -10,8 +10,10 @@ void turnOffAudio();
 #define PWR_AUDIO 0 // GPIO 0
 #define VOL_MIN 0
 #define VOL_MAX 30
+#define VOL_DEFAULT 20
 
 DFPlayerMini Player;
+uint8_t vol = VOL_DEFAULT;
 
 void initPlayer()
 {

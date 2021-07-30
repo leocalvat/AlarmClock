@@ -47,7 +47,6 @@ bool snoozeEnable = false;
 bool alarming = false;
 bool displayed = false;
 bool blink = false;
-uint8_t vol = 20;
 uint8_t dim = 255;
 RgbColor dispColor = WHITE;
 
@@ -68,16 +67,8 @@ void setup()
     WiFi.forceSleepBegin();
     delay(1);
 
-    // Init LED strip
-    initDisplay();
-    displayMod = CLOCK;
-    dimMod = DIM_AUTO;
-
     // Init Memory
     EEPROM.begin(MEMORY_SIZE);
-
-    // Init RTC Module
-    initRTC();
 
     // Init IOs
     for (size_t pin = RTC_ALARM; pin <= BTN_PLAY; pin++)
@@ -110,6 +101,16 @@ void setup()
 
     // Init MP3 Player
     initPlayer();
+    if (!readVol(vol))
+        writeVol(vol);
+
+    // Init RTC Module
+    initRTC();
+
+    // Init LED strip
+    initDisplay();
+    displayMod = CLOCK;
+    dimMod = DIM_AUTO;
 
     Serial.println("Running...");
 }
@@ -182,7 +183,10 @@ void loop()
             displayed = true;
         }
         if ((millis() - tsMod) > INTERVAL_DISPLAY)
+        {
+            writeVol(vol);
             displayMod = CLOCK;
+        }
         break;
     case SET_HOUR:
     case SET_ALARM1_HOUR:
@@ -484,9 +488,19 @@ void loop()
         if (alarming)
             turnOffAlarm();
         else if (displayMod == ALARM1)
+        {
             setAlarm(ALARM_ONE, !AlarmOne);
+            bool garbage;
+            readAlarm(ALARM1_ADDR, tempDateTime.hour, tempDateTime.min, garbage);
+            writeAlarm(ALARM1_ADDR, tempDateTime.hour, tempDateTime.min, AlarmOne);
+        }
         else if (displayMod == ALARM2)
+        {
             setAlarm(ALARM_TWO, !AlarmTwo);
+            bool garbage;
+            readAlarm(ALARM2_ADDR, tempDateTime.hour, tempDateTime.min, garbage);
+            writeAlarm(ALARM2_ADDR, tempDateTime.hour, tempDateTime.min, AlarmTwo);
+        }
         else
         {
             if (Player.isBusy())
